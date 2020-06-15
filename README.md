@@ -1,6 +1,6 @@
 # Gemma-SQL-Style
 The Gemma SQL style describes our SQL, dbt and jinja2 templating approach.
-We LIKE to discuss new styles and approaches, but this guideline should be used
+We like to discuss new styles and approaches, but this guideline should be used
 by everyone in Gemma Analytics for internal and client projects.
 
 ## Table of contents
@@ -150,6 +150,7 @@ by everyone in Gemma Analytics for internal and client projects.
   * Boolean fields should be prefixed with `is_`, `has_`, or `does_`
   * Date-only fields should be suffixed with `_date`
   * Datetime fields should be suffixed with `_at`
+  * Other date formats like shall also be suffixes like `_month`
 
 
   ```sql
