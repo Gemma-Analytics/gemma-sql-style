@@ -8,6 +8,8 @@ This style guide is already quite long and still cannot cover every intricacy or
   * reducing time spend deciphering SQL, whether in PRs or reading your own old code
   * avoid slips because missing keywords etc. become more obvious
 
+Therefore, if you are unsure about the formatting, try to format in a way that appears most suitable for the above.
+
 ## Table of contents
 * [Example](#example)
 * [Guidelines](#guidelines)
