@@ -1,1073 +1,987 @@
 # Gemma-SQL-Style
-The Gemma SQL style describes our SQL, dbt and jinja2 templating approach.
-We like to discuss new styles and approaches, but this guideline should be used
-by everyone in Gemma Analytics for internal and client projects.
+The Gemma SQL style describes our SQL, dbt and jinja2 templating approach. We like to discuss new styles and approaches, but this guideline should be used by everyone in Gemma Analytics for internal and client projects. Exceptions can be made where a client follows their own style, in which case following their SQL style may be more appropriate.
+
+This style guide is already quite long and still cannot cover every intricacy or special case. In general, the reason to have a SQL style guide is to
+- Make our SQL easily readable for ourselves and clients
+- Increase development speed by
+  a) reducing time spent thinking about formatting (it's pre-determined)
+  b) reducing time spend deciphering SQL, whether in PRs or reading your own old code
+  c) avoid slips because missing keywords etc. become more obvious
 
 ## Table of contents
-
-
-  * [Example](#example)
-  * [Guidelines](#guidelines)
-    + [General conventions](#general-conventions)
-      - [Keywords](#keywords)
-      - [Name conventions](#name-conventions)
-      - [Table name conventions](#table-name-conventions)
-      - [Quotation](#quotation)
-    + [Line conventions](#line-conventions)
-      - [Single line vs multiple line queries](#single-line-vs-multiple-line-queries)
-      - [Line character limit](#line-character-limit)
-      - [Line alignment](#line-alignment)
-      - [When alignment](#when-alignment)
-      - [Where alignment](#where-alignment)
-      - [Line order conventions](#line-order-conventions)
-    + [Join conventions](#join-conventions)
-      - [Join general conventions](#join-general-conventions)
-      - [Join order](#join-order)
-    + [Group conventions](#group-conventions)
-      - [Group by style](#group-by-style)
-      - [Group by order](#group-by-order)
-      - [Lateral column aliasing](#lateral-column-aliasing)
-    + [CTEs (Common Table Expressions)](#ctes--common-table-expressions-)
-    + [dbt (data build tool)](#dbt--data-build-tool-)
-      - [jinja2 macros](#jinja2-macros)
-    + [Small things](#small-things)
-      - [Field separation](#field-separation)
-      - [Equations](#equations)
-      - [Parenthesis](#parenthesis)
-      - [Long list](#long-list)
-      - [Long nested functions](#long-nested-functions)
-      - [Window functions](#window-functions)
-      - [Boolean conditions](#boolean-conditions)
+* [Example](#example)
+* [Guidelines](#guidelines)
+  + [General conventions](#general-conventions)
+    - [Keywords](#keywords)
+    - [Name conventions](#name-conventions)
+    - [Table name conventions](#table-name-conventions)
+    - [Quotation](#quotation)
+  + [Line conventions](#line-conventions)
+    - [Single line vs multiple line queries](#single-line-vs-multiple-line-queries)
+    - [Line character limit](#line-character-limit)
+    - [Line alignment](#line-alignment)
+    - [When alignment](#when-alignment)
+    - [Where alignment](#where-alignment)
+    - [Line order conventions](#line-order-conventions)
+  + [Join conventions](#join-conventions)
+    - [Join general conventions](#join-general-conventions)
+    - [Join order](#join-order)
+  + [Group conventions](#group-conventions)
+    - [Group by style](#group-by-style)
+    - [Group by order](#group-by-order)
+    - [Lateral column aliasing](#lateral-column-aliasing)
+  + [CTEs (Common Table Expressions)](#ctes--common-table-expressions-)
+  + [dbt (data build tool)](#dbt--data-build-tool-)
+    - [jinja2 macros](#jinja2-macros)
+  + [Small things](#small-things)
+    - [Field separation](#field-separation)
+    - [Equations](#equations)
+    - [Parenthesis](#parenthesis)
+    - [Long list](#long-list)
+    - [Long nested functions](#long-nested-functions)
+    - [Window functions](#window-functions)
+    - [Boolean conditions](#boolean-conditions)
 
 ## Example
 
-  Here's a general query example with most of the guidelines to show a typical
-  query at Gemma Analytics.
+Here's a general query example with most of the guidelines to show a typical query at Gemma Analytics.
 
-  ```sql
-  WITH users AS (
+```sql
+WITH users AS (
 
-    SELECT * FROM {{ ref('raw_users') }}
+  SELECT * FROM {{ ref('raw_users') }}
 
-  ), accounts AS (
+), accounts AS (
 
-    SELECT * FROM {{ ref('raw_accounts') }}
+  SELECT * FROM {{ ref('raw_accounts') }}
 
-  ), number_of_accounts AS (
+), number_of_accounts AS (
+
+  SELECT
+      user_id
+    , created_date
+
+    , COUNT(account_id) AS account_count
+
+  FROM accounts
+  GROUP BY 1, 2
+
+), final AS (
 
     SELECT
-      user_id
-      , created_date
-
-      COUNT(account_id) AS account_count
-
-    FROM accounts
-    GROUP BY 1, 2
-
-  ), final AS (
-
-      SELECT
         users.user_id
-        , users.type
-        , users.group
-        , users.created_date
-        , number_of_accounts.account_count
-        , CASE
-            WHEN
-              users.type = 'removed' AND
-              users.group = 'not_available'
-              THEN FALSE
-            ELSE TRUE
-          END AS is_active
-        , ROW_NUMBER() OVER (
-            PARTITION BY users.user_id
-            ORDER BY users.created_date ASC
-          ) AS user_rank
-        , {{ some_dbt_macro() }} AS some_field
+      , users.type
+      , users.group
+      , users.created_date
+      , na.account_count
+      , NOT (users.type = 'removed' AND users.group = 'not_available') AS is_active
+      , ROW_NUMBER() OVER (
+          PARTITION BY users.user_id
+          ORDER BY users.created_date ASC
+        ) AS user_rank
+      , {{ some_dbt_macro() }} AS some_field
 
-      FROM users
-      LEFT JOIN number_of_accounts ON
-        users.user_id = number_of_accounts.user_id
-        users.created_date = number_of_accounts.created_date
-      WHERE
-        users.type != 'test' AND
-        users.group IN (
-          'Germany',
-          'USA',
-          'France'
-        )
-      ORDER BY users.created_date DESC
+    FROM users
+      LEFT JOIN number_of_accounts AS na
+        ON na.user_id = users.user_id
+        AND na.created_date = users.created_date
+    WHERE users.type != 'test'
+      AND users.group IN (
+          'Germany'
+        , 'USA'
+        , 'France'
+      )
+    ORDER BY users.created_date DESC
 
-  )
+)
 
-  SELECT * FROM final
-  ```
+SELECT * FROM final
+```
+
 ## Guidelines
 
 ### General conventions
 
 #### Keywords
 
-  * Use uppercase for SQL keywords and functions (better 1st sight  separation)
-  * Don't use keywords for table, field names and aliases
-
-
-  ```sql
-  -- Good
-  SELECT
-    user_id
-    , type
-    , created_at
-
-  FROM test
-  WHERE type = 'test'
-  ORDER BY user_id ASC
-
-  -- Good
-  SELECT
-    type
-    , COUNT(*) AS amount
-  WHERE type = 'test'
-  GROUP BY 1
-
-  -- Bad
-  select
-    type
-    , count(*) as amount
-  from test
-  where type = 'test'
-  group by user_id
-
-  ```
-
-#### Name conventions
-
-  * Don't use reserved keywords such as `JOIN`, `date`, etc.
-  * Use snake_case (lowercase words, separated by underscore)
-  * Rename fields if source table is providing e.g. camelCase
-  * Renaming should be on lowest dbt model level -> raw/base models
-  * Make especially ids more explicit (user_id instead of id)
-  * Boolean fields should be prefixed with `is_`, `has_`, or `does_`
-  * Date-only fields should be suffixed with `_date`
-  * Datetime fields should be suffixed with `_at`
-  * Other date formats like shall also be suffixes like `_month`
-
-
-  ```sql
-  -- Good: field names
-  SELECT
-    user_id
-    , is_active
-    , signup_date
-    , created_at
-
-  FROM users
-
-  -- Good: base/raw model field renamings
-  SELECT
-    Id AS user_id
-    , user-type AS user_type
-    , createdAt AS created_at
-
-  FROM {{ source('example_db', 'users') }}
-  ```
-
-  * Use `AS` to alias column names
-
-
-    ```sql
-    -- Good
-    SELECT
-        user_id
-        , email
-        , TIMESTAMP_TRUNC(created_at, month) AS signup_month
-
-    FROM users
-
-    -- Bad
-    SELECT
-        user_id
-        , email
-        , TIMESTAMP_TRUNC(created_at, month) signup_month
-
-    FROM users
-    ```
-
-#### Table name conventions
-
-  * Base/Raw tables/models should be a plural case of the noun
-  * Don't abbreviate table names like `users` to `u` and `charges` to `c`
-    because it will make the code less readable. Better use shorter CTE names
-  * So use full table or CTE name, except you want to join a table more than one
-    time. Then you need aliases.
-
-
-  ```sql
-  -- good: table names
-  SELECT * FROM users
-  SELECT * FROM visit_logs
-
-  -- bad: table names
-  SELECT * FROM user
-  SELECT * FROM visitLog
-
-  -- good: aliasing
-  SELECT
-    users.name
-
-    , SUM(charges.amount) AS total_revenue
-
-  FROM users
-  INNER JOIN charges ON users.user_id = charges.user_id
-  GROUP BY 1
-
-  -- bad: aliasing
-  SELECT
-    u.name
-
-    , COUNT(c.type) AS total_revenue
-
-  FROM users u
-  INNER JOIN charges c ON u.user_id = c.user_id
-  GROUP BY 1
-
-  -- exception: multiple joins of same table (silly query)
-  SELECT
-    users_1.name
-
-    , COUNT(users_2.amount) AS silly_count
-
-  FROM users AS users_1
-  INNER JOIN users AS users_2 ON users_1.user_id = users_2.user_id
-  GROUP BY 1
-  ```
-
-
-#### Quotation
-
-  * Use single quote notation for string values (also dbt model names)
-  * Double quotes are usually used for field and table names (therefore some
-    data bases interpret strings as field names)
-  * For nested jinja2 templating please also use single quotes
-
-
-  ```sql
-  -- Good
-  SELECT
-    CASE
-      WHEN type = 'test' THEN 1
-      ELSE 0
-    END AS "is_test_user" -- this is not necessary with snake_CASE
-    , DATE(created_at, '{{ var('timezone') }}') AS created_date
-
-  FROM users
-  WHERE type != 'error'
-
-  -- Bad
-  SELECT
-    *
-  FROM users
-  WHERE type = "test"
-  ```
-
-### Line conventions
-
-#### Single line vs multiple line queries
-
-  * Only use single lines when there's no complexity and one thing is selected
-
-
-  ```sql
-  -- Good
-  SELECT * FROM users
-
-  -- Good
-  SELECT user_id FROM users
-
-  -- Good
-  SELECT COUNT(*) FROM users
-
-  -- Bad
-  SELECT user_id, CASE WHEN 1 = 1 THEN 1 ELSE 0 END AS test FROM users
-  ```
-
-  * Use for every SQL keyword a new line (or keyword groups like `ORDER BY`)
-  * Use for every selected field a new line (empty line before `FROM` statement)
-
-
-  ```sql
-  -- Good
-  SELECT
-    user_id
-    , type
-    , created_at
-
-  FROM users
-
-  -- Good
-  SELECT DISTINCT -- is keyword group
-    type
-
-  FROM users
-  WHERE email = 'example@domain.com'
-  ORDER BY 1 DESC
-
-  -- Good
-  SELECT
-      type
-      , COUNT(*) AS amount
-
-  FROM users
-  GROUP BY 1
-
-  -- Bad
-  SELECT user_id, type, created_at
-  FROM users WHERE type = 'test'
-
-  -- Bad
-  SELECT user_id,
-      type
-  FROM users
-  ```
-
-#### Line character limit
-
-  * As in other code languages use 80 characters per line limit
-    (example why we should stick to 80 characters
-    [link](https://nickjanetakis.com/blog/80-characters-per-line-is-a-standard-worth-sticking-to-even-today))
-
-
-  ```sql
-  -- Good: less than 80 characters
-  SELECT
-    user_id
-    , type
-    , created_at
-    , CASE
-        WHEN 1 = 1 THEN 'test' ELSE 'error'
-      END AS test_field
-
-    FROM users
-
-  -- Bad: more than 80 characters
-  SELECT user_id, type, created_at, CASE WHEN 1 = 1 THEN 'test' ELSE 'error' END AS test_field
-  FROM users
-  ```
-
-#### Line alignment
-
-  * Left align SQL keywords
-  * Field names and field calculations are to indent
-  * Sub-keywords are also to indent (like `WHEN`)
-  * Every indention level is 1 tab or 2 whitespaces
-
-
-  ```sql
-  -- Good: aligment
-  SELECT
-    user_id
-    , email
-
-  FROM users
-  WHERE email LIKE '%@gmail.com'
-
-  -- Bad
-  SELECT user_id, email
-    FROM users
-   WHERE email LIKE '%@gmail.com'
- ```
-
-#### When alignment
-
-  * Each `WHEN`/`ELSE` of a `CASE` statement should be on its own line.
-  * The `THEN` can be on the same line as the `WHEN` keyword if it does fit
-    the 80 characters limit. Aim to be consistent here.
-  * If a `WHEN` clause has logical operators, move the conditions to own lines
-
-
-  ```sql
-  -- Good:
-  SELECT
-    CASE
-      WHEN event_name = 'viewed_homepage' THEN 'Homepage'
-      WHEN event_name = 'viewed_editor' THEN 'Editor'
-      ELSE 'Other'
-    END AS page_name
-
-  FROM events
-
-  -- Good too
-  SELECT
-    CASE
-      WHEN
-        event_name = 'viewed_homepage' OR
-        event_name = 'home'
-        THEN 'Homepage'
-      WHEN
-        event_name = 'viewed_editor' AND
-        type = 'edit'
-        THEN 'Editor'
-      ELSE 'Other'
-    END AS page_name
-
-  FROM events
-
-  -- Bad
-  SELECT
-      CASE WHEN event_name = 'viewed_homepage' OR event_name = 'home'
-      THEN 'Homepage'
-          WHEN event_name = 'viewed_editor' AND type = 'edit 'THEN 'Editor'
-          ELSE 'Other'
-      END AS page_name
-
-  FROM events
-  ```
-
-#### Where alignment
-  * When there is only one `WHERE` condition, leave it on the same line
-  * With multiple conditions indent those one level deeper and put the logical
-    operators at the end of the previous condition
-  * For multiple `OR` conditions try to use the `IN` operator if possible
-
-
-  ```sql
-  -- good
-  SELECT
-    *
-  FROM users
-  WHERE user_id = 1234
-
-  -- good
-  SELECT
-    *
-  FROM users
-  WHERE
-    created_at >= '2019-01-01' AND
-    type != 'test' AND
-    is_active = true
-  ORDER BY user_id ASC
-
-  -- bad
-  SELECT
-    *
-  FROM users
-  WHERE created_at >= '2019-01-01' AND type != 'test' AND is_active = true
-  ORDER BY user_id ASC
-
-  -- good
-  SELECT
-    *
-  FROM users
-  WHERE
-    created_at >= '2019-01-01' AND
-    user_id IN (1234, 2345, 3456, 4567)
-  ORDER BY user_id ASC
-
-  -- bad: multiple ORs
-  SELECT
-    *
-  FROM users
-  WHERE
-    created_at >= '2019-01-01' AND (
-    user_id = 1234 OR
-    user_id = 2345 OR
-    user_id = 3456 OR
-    user_id = 4567)
-  ORDER BY user_id ASC
-  ```
-
-#### Line order conventions
-
-  * Primery key first
-  * Foregin keys second
-  * String, Integer and Boolean columns
-  * Other columns
-  * Date(-time) columns
-  * With a white space separated the aggregation columns (`MIN`, `SUM`, etc.)
-    at the end
-
-
-  ```sql
-  -- Good
-  SELECT
-      user_id
-      , type_id
-      , name
-      , is_active
-      , is_deleted
-      , created_at
-      , signup_date
-
-      , COUNT(hits) AS number_of_hits
-      , MIN(hit_created_at) AS first_event_date
-
-  FROM events
-  GROUP BY 1,2,3,4,5,6,7
-  -- don't do that, its just for query correctness. see group-by section
-
-  -- Bad
-  SELECT
-      signup_date
-      , type_id
-      , MAX(hit_created_at) AS first_event_date
-      , created_at
-      , name
-      , user_id
-      , is_active
-      , COUNT(hits) AS number_of_hits
-      , is_deleted
-
-  FROM users
-  GROUP BY 1,2,4,5,6,7,9
-  ```
-
-### Join conventions
-
-#### Join general conventions
-
-  * Use in general `LEFT JOIN` as often as possible
-  * Use explicit join types (`INNER JOIN` instead of just `JOIN`)
-  * Naming of aliases, see [Table name conventions](#table-name-conventions)
-  * Single join conditions should be on the same line as the join
-  * Alternatively use the `USING` keyword for single condition joins
-
-
-  ```sql
-  -- Good
-  SELECT
-    users.name
-
-    , COUNT(payment_methods.method_id) AS number_of_payment_methods
-
-  FROM users
-  LEFT JOIN payment_methods ON users.user_id = payment_methods.user_id
-  GROUP BY 1
-
-  -- Good
-  SELECT
-    users.name
-
-    , COUNT(payment_methods.method_id) AS number_of_payment_methods
-
-  FROM users
-  LEFT JOIN payment_methods USING(user_id)
-  GROUP BY 1
-
-  -- Bad
-  SELECT
-    u.name
-
-    , COUNT(p.method_id) AS number_of_payment_methods
-
-  FROM users u
-  JOIN payment_methods p
-  ON u.user_id = p.user_id
-  GROUP BY 1
-  ```
-
-  * Multiple join conditions shall have their own line aligned like in this
-    section [Where alignment](#where-alignment)
-  * Include the table name when there is a join, but omit it otherwise
-
-
-  ```sql
-  -- Good
-  SELECT
-    users.name
-
-    , COUNT(payment_methods.amount) AS number_of_payment_methods
-
-  FROM users
-  LEFT JOIN payment_methods ON
-    users.user_id = payment_methods.user_id AND
-    users.created_at = payment_methods.created_at
-  GROUP BY 1
-
-  -- Bad
-  SELECT
-    name
-
-    , COUNT(amount) AS number_of_payment_methods
-
-  FROM users
-  LEFT JOIN payment_methods ON
-    user_id = user_id AND
-    created_at = created_at
-  GROUP BY 1
-  ```
-
-#### Join order
-
-  * Put the table that is referenced first after the
-    `JOIN ... ON` condition
-  * This will help determinate fan-out (for more information:
-    [fanning-out]("https://discourse.looker.com/t/outer-join-on-false-or-how-i-learned-to-stop-fanning-out-and-love-the-null/4786"))
+  * Use uppercase for SQL keywords and functions (better 1st sight separation)
+  * Don't use keywords for CTEs, tables, field names, and aliases (exception: `final` for the final CTE)
 
 
 ```sql
 -- Good
 SELECT
-    ...
-FROM payment_methods
-LEFT JOIN users ON payment_methods.user_id = users.user_id
--- foreign_key = primary_key --> many-to-one --> no fanout
+    type
+  , COUNT(*) AS amount
+WHERE type = 'test'
+GROUP BY 1
+
+-- Bad
+select
+    type
+  , count(*) as amount
+from test
+where type = 'test'
+group by user_id
+```
+
+#### Name conventions
+
+  * Don't use reserved keywords such as `join`, `from` etc.
+  * Use snake_case (all lowercase, only letters and underscores, starting with a letter)
+  * Rename fields if source tables do not adhere to these naming conventions
+  * A primary key column should be called `id`
+  * Renaming should be on lowest dbt model level -> base models
+  * Boolean fields should be appropriately prefixed, e.g. with `is_`, `has_`, `was_`, or `does_`
+  * Date fields should be suffixed with `_on` or `_date`
+  * Timestamp fields should be suffixed with `_at`
+  * Timestamp or date fields truncated to a period (e.g. year, quarter, month) shoud be suffixed with that period, e.g. `_month`
+  * Always use `AS` to explicitly alias column names
+
+```sql
+-- Good: field names
+SELECT
+    user_id AS id -- primary key
+  , is_active -- type: boolean
+  , signup_on -- type: date
+  , churn_date -- type: date
+  , created_at -- time: timestamp with time zone
+
+FROM users
+
+-- Good: base/raw model field renamings
+SELECT
+    "Id" AS id
+  , "user-type" AS user_type
+  , "createdAt" AS created_at
+
+FROM {{ source('example_db', 'users') }}
 
 -- Good
 SELECT
-    ...
+      id
+    , email
+    , TIMESTAMP_TRUNC(created_at, month) AS signup_month
+
 FROM users
-LEFT JOIN payment_methods ON users.user_id = payment_methods.user_id
--- primary_key = foreign_key --> one-to-many --> fanout
 
 -- Bad
 SELECT
-    ...
-FROM users
-LEFT JOIN payment_methods ON payment_methods.user_id = users.user_id
+      user_id
+    , "Email"
+    , "createdAt" AS created_date -- timestamp with time zone with wrong naming!
+    , TIMESTAMP_TRUNC(created_at, month) signup_month
 
+FROM users
+```
+
+#### Comments
+
+* One-line comments should use the double-dash syntax
+* Multi-line comments should use the multi-line syntax with a start and end row
+* When writing Jinja in dbt, use Jinja multi-line comments for Jinja-related comments and use SQL comments for SQL-related comments; never use SQL comments in macros!
+
+```sql
+-- This is a single line comment
+/*
+ *  Multi line comments are beautiful if you use this syntax instead of multiple
+ *  single-line comments or, heaven forvid, starting and ending your multi-line
+ *  comment in the same line.
+ */
+
+-- two single line comments
+-- are not desirable
+
+/* this is not wanted, either */
+
+/* You could start right away, but it is a matter of beauty and readability to not
+start in the first line and to use the starts on each line to mark the comment */
+
+{# This is a single line Jinja comment - use the multi-line syntax #}
+
+{#
+ #  Multi-line Jinja comments are the same syntax but using the same multi-line
+ #  comment style. You must not use SQL comments in macros because that would
+ #  potentially cause issue if the macro is called in a comment!
+ #}
+
+```
+
+#### Table name conventions
+
+* Base/Raw tables/models should be a plural case of the noun, but if not at the very least it should be consistent throughout a repository
+* If table or CTE names are not short and concise, use reasonable and short aliases in queries
+* If joining the same tables multiple times, try to use aliases relating to the business logic
+
+```sql
+-- good: table names
+SELECT * FROM users
+SELECT * FROM visit_logs
+
+-- bad: table names
+SELECT * FROM user
+SELECT * FROM visitLog
+
+-- good: aliasing
+SELECT
+    users.name
+  , SUM(chrg.amount) AS total_revenue
+FROM users
+  LEFT JOIN user_charges AS chrg
+    ON chrg.user_id = users.user_id
+GROUP BY 1
+
+-- bad: aliasing
+SELECT
+    u.name
+  , COUNT(c.type) AS total_revenue
+FROM users u
+  LEFT JOIN charges c
+    ON c.user_id = u.user_id
+GROUP BY 1
+
+-- good: aliasing with multiple instances of the same table
+SELECT
+    managers.name AS manager_name
+  , employees.name AS employee_name
+
+FROM users AS managers
+  LEFT JOIN users AS employees
+    ON employees.manager_id = managers.id
+WHERE NOT employess.id IS NULL
+```
+
+### Line conventions
+
+#### Single line vs multi-line queries
+
+##### Single Line Queries
+
+  * Only use single lines when there's no complexity and all or one thing is selected
+
+```sql
+-- Good
+SELECT * FROM users
+
+-- Good
+SELECT user_id FROM users
+
+-- Good
+SELECT COUNT(*) FROM users
+
+-- Bad
+SELECT user_id, CASE WHEN 1 = 1 THEN 1 ELSE 0 END AS test FROM users
+```
+
+##### Multi-Line Queries
+
+  * New line for every SQL keyword
+  * New line for every selected field
+
+```sql
+-- Good
+SELECT
+    user_id
+  , type
+  , created_at
+
+FROM users
+
+-- Good
+SELECT DISTINCT -- exception: DISTINCT can directly follow a SELECT
+  type
+
+FROM users
+WHERE email = 'example@domain.com'
+ORDER BY 1 DESC
+
+-- Good
+SELECT
+    type
+  , COUNT(*) AS amount
+
+FROM users
+GROUP BY 1
+
+-- Bad
+SELECT user_id, type, created_at
+FROM users WHERE type = 'test'
+
+-- Bad
+SELECT user_id,
+    type
+FROM users
+```
+
+#### Line character limit
+
+  * As in other code languages use 88 characters per line limit ([here is an article on why we should stick to 88 characters](https://nickjanetakis.com/blog/80-characters-per-line-is-a-standard-worth-sticking-to-even-today) - we prefer 88 over 80, though, as that tends to reduce linebreaks significantly and is still reasonable)
+
+
+```sql
+-- Good: each line is less than 88 characters
+SELECT
+    user_id
+  , type
+  , created_at
+  , CASE
+      WHEN 1 = 1 THEN 'test' ELSE 'error'
+    END AS test_field
+
+  FROM users
+
+-- Bad: more than 88 characters
+SELECT
+    user_id
+  , type
+  , created_at
+  , CASE WHEN this_long_field_name = some_other_field THEN 'test' ELSE 'error' END AS test_field
+FROM users
+```
+
+#### Line Alignment and Indentation
+
+  * Left align SQL keywords
+  * Field names and field calculations are indented
+  * Sub-keywords that belong to a keyword group are also indented
+  * Every indention level is 1 tab = 2 spaces
+  * The first field name is indented to the same level as the other field names
+
+
+```sql
+-- Good: aligment
+SELECT
+    user_id
+  , email
+
+FROM users
+WHERE email LIKE '%@gmail.com'
+
+-- Bad
+SELECT user_id, email
+  FROM users
+ WHERE email LIKE '%@gmail.com'
+```
+
+#### When alignment
+
+  * Each `WHEN`/`ELSE` of a `CASE` statement should be on its own line.
+  * The `THEN` can be on the same line as the `WHEN` keyword if it fits the 88 characters limit
+  * If a `WHEN` clause has logical operators, move the conditions to own lines
+
+
+```sql
+-- Good:
+SELECT
+    event_id
+  , CASE
+      WHEN event_name = 'viewed_homepage' THEN 'Homepage'
+      WHEN event_name = 'viewed_editor' THEN 'Editor'
+      ELSE 'Other'
+    END AS page_name
+
+FROM events
+
+-- Good:
+SELECT
+    event_id
+  , CASE
+      WHEN event_name = 'viewed_homepage'
+        OR event_name = 'home'
+        THEN 'Homepage'
+      WHEN event_name = 'viewed_editor'
+        AND type = 'edit'
+        THEN 'Editor'
+      ELSE 'Other'
+    END AS page_name
+
+FROM events
+
+-- Bad
+SELECT
+    event_id
+  , CASE WHEN event_name = 'viewed_homepage' OR event_name = 'home'
+    THEN 'Homepage'
+        WHEN event_name = 'viewed_editor' AND type = 'edit 'THEN 'Editor'
+        ELSE 'Other'
+    END AS page_name
+
+FROM events
+```
+
+#### Where alignment
+* The first condition is on the same level as the `WHERE` keyword
+* Each subsequent condition starts with one indentation and the logical operator
+* For multiple `OR` conditions try to use the `IN` operator if possible
+* Boolean special rules
+  - fields can be used without comparison IF their naming is appropriate (e.g. is_active)
+  - Negations are at the earliest possible point, e.g. `NOT name IS NULL` instead of `name IS NOT NULL`
+  - Use negation where possible (e.g. `NOT name = 'test'` instead of `name != 'test'`)
+* Use parentheses abundantly - too many parentheses are better than too few
+* Readability is key - if in doubt, and especially if getting complex, choose what's most readable and add comments wherever possible
+
+
+```sql
+-- good
+SELECT
+  *
+FROM users
+WHERE user_id = 1234
+
+-- good
+SELECT
+  *
+FROM users
+WHERE created_at >= '2019-01-01' -- [add a comment why excluding them here]
+  AND NOT type = 'test'
+  AND is_active -- no need to write = TRUE
+ORDER BY user_id ASC
+
+-- bad
+SELECT
+  *
+FROM users
+WHERE created_at >= '2019-01-01' AND type != 'test' AND is_active = true
+ORDER BY user_id ASC
+
+-- good
+SELECT
+  *
+FROM users
+WHERE created_at >= '2019-01-01'
+  AND user_id IN (1234, 2345, 3456, 4567)
+ORDER BY user_id ASC
+
+-- bad: multiple ORs
+SELECT
+  *
+FROM users
+WHERE
+  created_at >= '2019-01-01' AND (
+  user_id = 1234 OR
+  user_id = 2345 OR
+  user_id = 3456 OR
+  user_id = 4567)
+ORDER BY user_id ASC
+```
+
+#### Line order conventions
+
+* Primery key first
+* Foregin keys second
+* Attributes next (try to logically group them)
+* Metrics at the end
+* Aggregations are separated by an empty line and added at the end
+
+
+```sql
+-- Good
+SELECT
+      user_id
+    , type_id
+    , name
+    , is_active
+    , is_deleted
+    , created_at
+    , signup_date
+
+    , COUNT(hits) AS number_of_hits
+    , MIN(hit_created_at) AS first_event_date
+
+FROM events
+GROUP BY 1,2,3,4,5,6,7
+
+-- Bad
+SELECT
+      signup_date
+    , type_id
+    , MAX(hit_created_at) AS first_event_date
+    , created_at
+    , name
+    , user_id
+    , is_active
+    , COUNT(hits) AS number_of_hits
+    , is_deleted
+
+
+FROM users
+GROUP BY 1,2,4,5,6,7,9
+```
+
+### Join conventions
+
+#### Join general conventions
+
+* All `JOIN`s are `LEFT JOIN`s
+* If we use the `INNER JOIN`, we make it explicit (`INNER JOIN` instead of just `JOIN`), and add a comment why - remember, all `JOIN`s are `LEFT JOIN`s @ Gemma unless there is a specific reason to do otherwise! (to avoid `NULL`s doesn't count as a reason: if `NULL`s are not allowed, you must test for it instead of forcing it)
+* If we use the `CROSS JOIN`, we make it explicit and add a comment, except for `JSONB` functions such as `JSONB_ARRAY_ELEMENTS()`, which can be cross-joined using the comma notation
+* Naming of aliases, see [Table name conventions](#table-name-conventions)
+* `JOIN`s are part of the `FROM` keyword group and must be indented accordingly
+* All join conditions have their own line, and the joined table's columns always appear on the left side of any condition
+* Because our primary keys are usually called `id`, we rarely use the `USING` keyword, but if we do, it is in a new line and indented
+
+```sql
+-- Good
+SELECT
+    users.name
+
+  , COUNT(pm.method_id) AS number_of_payment_methods
+
+FROM users
+  LEFT JOIN payment_methods AS pm
+    ON pm.user_id = users.user_id
+GROUP BY 1
+
+-- Good
+SELECT
+    users.name
+
+  , COUNT(pm.method_id) AS number_of_payment_methods
+
+FROM users
+  LEFT JOIN payment_methods AS pm
+    USING(user_id)
+GROUP BY 1
+
+-- Good
+SELECT
+    managers.name
+  , employees.name
+FROM users AS managers
+  LEFT JOIN users AS employees
+    ON employees.manager_id = managers.id
+    AND NOT employees.branch = managers.branch
+WHERE NOT employees.id IS NULL
+
+-- Bad
+SELECT
+    u.name
+
+  , COUNT(p.method_id) AS number_of_payment_methods
+
+FROM users u
+JOIN payment_methods p ON u.user_id = p.user_id
+GROUP BY 1
 ```
 
 ### Group conventions
 
 #### Group by style
 
-  * Please group by numbers
+  * If at all possible, group by referencing the column position(s) with integers
   * Try to use as few as possible `GROUP BY` fields. Its a bad sign if you
     group by more than 2-3 fields. Use CTEs instead. Have a read:
     [group-by-1](https://blog.getdbt.com/write-better-sql-a-defense-of-group-by-1/)
+  * In very rare cases it may be necessary to add a field name to the `GROUP BY` fields, in that case add the explicit column name after the integers
 
 
-  ```sql
-  -- Good
-  SELECT
+```sql
+-- Good
+SELECT
     created_date
+  , type
+
+  , COUNT(*) AS users_count
+
+FROM users
+GROUP BY 1, 2
+
+-- Acceptable, but not preferred
+SELECT
+    created_date
+  , user_id
+
+  , COUNT(*) AS users_count
+
+FROM users
+GROUP BY created_date, user_id
+
+-- Bad
+SELECT
+      created_date
     , type
 
     , COUNT(*) AS users_count
 
-  FROM users
-  GROUP BY 1, 2
-
-  -- okay
-  SELECT
-    created_date
-    , user_id
-
-    , COUNT(*) AS users_count
-
-  FROM users
-  GROUP BY created_date, user_id
-
-  -- Bad
-  SELECT
-      created_date
-      , type
-
-      , COUNT(*) AS users_count
-
-  FROM users
-  GROUP BY 1, type
-  ```
-
-#### Group by order
-
-  * Grouping columns should go first
-  * If there are many fields, follow
-    [line-order-convention](#line-order-convention), where the not aggregated
-    go first and the aggregated fields last
-
-
-  ```sql
-  -- Good
-  SELECT
-    TIMESTAMP_TRUNC(created_at, year) AS signup_year
-
-    , COUNT(*) AS total_users
-
-  FROM users
-  GROUP BY 1
-
-  -- Bad
-  SELECT
-    COUNT(*) AS total_users
-    , TIMESTAMP_TRUNC(created_at, year) AS signup_year
-
-  FROM users
-  GROUP BY 1
-  ```
+FROM users
+GROUP BY 1, type
+```
 
 #### Lateral column aliasing
 
   * Take advantage of lateral column aliasing when grouping by name
 
 
-  ```sql
-  -- Good
-  SELECT
+```sql
+-- Good
+SELECT
     TIMESTAMP_TRUNC(created_at, year) AS signup_year
 
-    , COUNT(*) AS total_users
+  , COUNT(*) AS total_users
 
-  FROM users
-  GROUP BY 1
+FROM users
+GROUP BY 1
 
-  -- Bad
-  SELECT
+-- Bad
+SELECT
     TIMESTAMP_TRUNC(created_at, year) AS signup_year
 
-    , COUNT(*) AS total_users
+  , COUNT(*) AS total_users
 
-  FROM users
-  GROUP BY TIMESTAMP_TRUNC(created_at, year)
-  ```
+FROM users
+GROUP BY TIMESTAMP_TRUNC(created_at, year)
+```
 
 ### CTEs (Common Table Expressions)
 
-  * Use CTEs instead of subqueries.
-    Subqueries are less readable and can't be reused
+* Use CTEs instead of subqueries whenever at all possible - subqueries are less readable and cannot be reused
+* First-level CTEs start and end with an empty line
+* Give your CTEs meaningful names - you can always alias them later if the CTE name is long
 
+```sql
+-- Good
+WITH test_users AS (
 
-  ```sql
-  -- Good
-  WITH test_users AS(
-
-    SELECT
-      *
-    FROM {{ ref('users') }}
-    WHERE type = 'test'
-
-  )
-
-  SELECT COUNT(*) FROM test_users
-
-  -- Bad
   SELECT
-    COUNT(*)
-  FROM (
-    SELECT
-      *
-    FROM {{ ref('users') }}
-    WHERE type = 'test'
-  )
-  ```
+    *
+  FROM {{ ref('users') }}
+  WHERE type = 'test'
 
-  * Starting and closing CTE parentheses are on the same line
-    (easier to out-comment)
-  * Always have clean "import" CTEs that just reference to other dbt models.
-    This way you make the sources reusable for different calculations
-  * Aim to have a final CTE called "final" at the end of the model. It helps to
-    have a final CTE while debugging and checking other CTEs.
-  * Try to have reasonable CTE names
+)
+
+SELECT COUNT(*) FROM test_users
+
+-- Bad
+SELECT
+  COUNT(*)
+FROM (
+  SELECT
+    *
+  FROM {{ ref('users') }}
+  WHERE type = 'test'
+)
+```
+
+* Starting and closing CTE parentheses are on the same line if you have multiple CTEs (easier to out-comment)
+* dbt: Always have clean "import" CTEs that just reference to other dbt models at the start - this way you make it clear which models are references, and the sources are reusable for different calculations within the query
+* Optional: When using CTEs, have a final CTE called "final" at the end of the model
 
 
-  ```sql
-  -- Good
-  WITH source AS(
+```sql
+-- Good
+WITH orders AS(
 
-    SELECT * FROM {{ ref('source') }}
+  SELECT * FROM {{ ref('orders_model') }}
 
-  ), revenue AS(
+), revenue AS(
 
-    SELECT
-      id
+  SELECT
+      user_id
 
-      , SUM(revenue) AS rev_per_id
+    , SUM(revenue) AS rev_per_id
 
-    FROM source
-    GROUP BY 1
+  FROM orders
+  GROUP BY 1
 
-  ), total AS(
+), total AS(
 
-    SELECT
-      id
+  SELECT
+      user_id
 
-      , COUNT(*) AS total_by_id
+    , COUNT(*) AS total_by_id
 
-    FROM source
-    GROUP BY 1
+  FROM orders
+  GROUP BY 1
 
-  ), final AS(
+), final AS(
 
-    SELECT
-      source.id
-      , revenue.rev_per_id
-      , total.total_by_id
+  SELECT
+      orders.*
+    , revenue.rev_per_id
+    , total.total_by_id
 
-    FROM source
-    LEFT JOIN revenue ON source.id = revenue.id
-    LEFT JOIN total ON source.id = total.id
-    WHERE source.type != 'test'
+  FROM orders
+    LEFT JOIN revenue
+      ON revenue.user_id = orders.user_id
+    LEFT JOIN total
+      ON total.user_id = orders.user_id
+  WHERE NOT source.type = 'test'
 
-  )
+)
 
-  SELECT * FROM final
+SELECT * FROM final
 
-  -- Bad
-  WITH
-  sum_agg AS(
+-- Bad
+WITH
+sum_agg AS(
 
-    SELECT
-      id
+  SELECT
+    id
 
-      , SUM(revenue) AS rev_per_id
+    , SUM(revenue) AS rev_per_id
 
-    FROM {{ ref('source') }}
-    GROUP BY 1
+  FROM {{ ref('source') }}
+  GROUP BY 1
 
-  ),
+),
 
-  count_agg AS(
+count_agg AS(
 
-    SELECT
-      id
+  SELECT
+    id
 
-      , COUNT(*) AS total_by_id
+    , COUNT(*) AS total_by_id
 
-    FROM {{ ref('source') }}
-    GROUP BY 1
+  FROM {{ ref('source') }}
+  GROUP BY 1
 
-  )
+)
 
 SELECT
-  source.id
-  , sum_agg.rev_per_id
-  , count_agg.total_by_id
+source.id
+, sum_agg.rev_per_id
+, count_agg.total_by_id
 
 FROM {{ ref('source') }}
 LEFT JOIN sum_agg ON source.id = sum_agg.id
 LEFT JOIN count_agg ON source.id = count_agg.id
 WHERE source.type != 'test'
-  ```
+```
 
 
 ### dbt (data build tool)
 
 #### jinja2 macros
 
-  * Keep code [DRY](https://docs.getdbt.com/docs/writing-code-in-dbt/macros/) by
-    using dbt jinja2 macros
-  * Not only it helps keep the code DRY, it also helps to have complex
-    calculations in one place and maintain it there
-  * For alignment: try to make the dbt SQL code readable, not necessarily the
-    compiled SQL code, which is tricky because of the jinja2 whitespacing
+* Keep code [DRY](https://docs.getdbt.com/docs/writing-code-in-dbt/macros/) by using dbt Jinja macros
+* Not only it helps keep the code DRY, it also helps to have complex calculations in one place and maintain it there
+* For alignment: try to make the dbt SQL code readable, not necessarily the compiled SQL code, which is tricky because of the jinja2 whitespacing
 
 
-  ```sql
-  -- Good: complex_macro() is always the same SQL function
+```sql
+-- Good: complex_macro() is always the same SQL function
 
-  -- the complex_macro in one place:
-  {% macro complex_macro() %}
+-- the complex_macro in one place:
+{% macro complex_macro() %}
 
-    SUM(revenue*100 - net_error_margin + sidecosts/5)
+  SUM(revenue*100 - net_error_margin + sidecosts/5)
 
-  {% endmacro %}
+{% endmacro %}
 
-  ...
+...
 
-  WITH source AS(
+WITH source AS(
 
-    SELECT * FROM {{ ref('source') }}
+  SELECT * FROM {{ ref('source') }}
 
-  ), revenue_by_date AS(
+), revenue_by_date AS(
 
-    SELECT
+  SELECT
       created_date
 
-      , {{ complex_macro() }} AS revenue
+    , {{ complex_macro() }} AS revenue
 
-    FROM source
-    GROUP BY 1
+  FROM source
+  GROUP BY 1
 
-  ), revenue_by_type AS(
+), revenue_by_type AS(
 
-    SELECT
+  SELECT
       type
 
-      , {{ complex_macro() }} AS revenue
+    , {{ complex_macro() }} AS revenue
 
-    FROM source
-    GROUP BY 1
+  FROM source
+  GROUP BY 1
 
-  )
+)
 
-  ...
+...
 
 
-  -- Bad: we have to write and maintain the calculation in multiple areas
-  WITH source AS(
+-- Bad: we have to write and maintain the calculation in multiple areas
+WITH source AS(
 
-    SELECT * FROM {{ ref('source') }}
+  SELECT * FROM {{ ref('source') }}
 
-  ), revenue_by_date AS(
+), revenue_by_date AS(
 
-    SELECT
+  SELECT
       created_date
 
-      , SUM(revenue*100 - net_error_margin + sidecosts/5) AS revenue
+    , SUM(revenue*100 - net_error_margin + sidecosts/5) AS revenue
 
-    FROM source
-    GROUP BY 1
+  FROM source
+  GROUP BY 1
 
-  ), revenue_by_type AS(
+), revenue_by_type AS(
 
-    SELECT
+  SELECT
       type
 
-      , SUM(revenue*100 - net_error_margin + sidecosts/5) AS revenue
+    , SUM(revenue*100 - net_error_margin + sidecosts/5) AS revenue
 
-    FROM source
-    GROUP BY 1
+  FROM source
+  GROUP BY 1
 
-  )
+)
 
-  ...
+...
 
-  ```
+```
 
 
 ### Small things
 
 #### Field separation
 
-  * Put the commas to the beginning of the line
+* Put the commas to the beginning of the line
+* Start the first field in line with the other fields
 
-
-  ```sql
-  -- Good
-  SELECT
+```sql
+-- Good
+SELECT
       user_id
-      , type
-      , created_at
+    , type
+    , created_at
 
-  FROM users
-  ```
+FROM users
+
+-- Bad
+SELECT
+  user_id
+  , type
+
+FROM users
+
+-- Bad
+SELECT
+  user_id,
+  type
+
+FROM users
+```
 
 #### Equations
 
-  * Use `!=` over `<>` (simply because its more readable)
+* Use `NOT a = b` over `a <> b` (simply because its more readable)
 
 
+```sql
+-- Good
+SELECT
+  COUNT(*) AS real_users_count
 
-  ```sql
-  -- Good
-  SELECT
-    COUNT(*) AS real_users_count
-
-  FROM users
-  WHERE type != 'test'
-  ```
+FROM users
+WHERE NOT type = 'test'
+```
 
 #### Parenthesis
 
-  * Avoid spaces inside of parenthesis
+* Avoid spaces inside of parenthesis
 
 
-  ```sql
-  -- Good
-  SELECT
-    *
-  FROM users
-  WHERE user_id in (1, 2)
+```sql
+-- Good
+SELECT
+  *
+FROM users
+WHERE user_id IN (1, 2)
 
-  -- Bad
-  SELECT
-    *
-  FROM users
-  WHERE user_id in ( 1, 2 )
-  ```
+-- Bad
+SELECT
+  *
+FROM users
+WHERE user_id IN ( 1, 2 )
+```
 
 #### Long list
 
-  * Break long lists of `IN` values into multiple indented lines
+* Break long lists of `IN` values into multiple indented lines
 
 
-  ```sql
-  -- Good
-  SELECT
-    *
-  FROM users
-  WHERE email in (
-      'user-1@example.com',
-      'user-2@example.com',
-      'user-3@example.com',
-      'user-4@example.com'
-  )
-  ```
+```sql
+-- Good
+SELECT
+  *
+FROM users
+WHERE email in ( -- here you can have either trailing or leading commas
+  'user-1@example.com',
+  'user-2@example.com',
+  'user-3@example.com',
+  'user-4@example.com'
+)
+```
 
 #### Long nested functions
 
-  * Break long nested functions (dbt macros or just SQL functions) into
-    multiple indented lines
+* Break long nested functions (dbt macros or just SQL functions) into multiple indented lines
 
 
-  ```sql
-  -- Good
-  SELECT
+```sql
+-- Good
+SELECT
     user_id
-    , {{ first_dbt_macro(
-           second_dbt_macro(
-             'some_input_value_1',
-             'some_input_value_2',
-             'some_input_value_3'
-           )
+  , {{ first_dbt_macro(
+         second_dbt_macro(
+           'some_input_value_1',
+           'some_input_value_2',
+           'some_input_value_3'
          )
-      }} AS macro_field
-    , type
-    , DATEDIFF(
-        day,
-        DATETIME(
-          timestamp_micros(some_super_long_timestamp),
-          'a_super_long_timezone'
-        ),
-        NOW()
-      ) AS date_difference_example
+       )
+    }} AS macro_field
+  , type
+  , DATEDIFF(
+      day,
+      DATETIME(
+        timestamp_micros(some_super_long_timestamp),
+        'a_super_long_timezone'
+      ),
+      NOW()
+    ) AS date_difference_example
 
-  FROM users
-  ```
+FROM users
+```
 
 
 #### Window functions
 
-  * You can leave it all on its own line or break it up into multiple depending
-    on its length ([Line character limit](#line-character-limit)).
-    Indention always by 1 tab or 2 whitespaces
+* You can leave it all on its own line or break it up into multiple depending on its length ([Line character limit](#line-character-limit))
+* If the window is long, or used more than once, consider defining it using the `WINDOW` keyword
 
-
-  ```sql
-  -- Good
-  SELECT
+```sql
+-- Good
+SELECT
     user_id
-    , name
+  , name
 
-    , ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY updated_date DESC)
-      AS details_rank
+  , ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY updated_date DESC)
+    AS details_rank
 
-  FROM users
+FROM users
 
-  -- Good
-  SELECT
+-- Good
+SELECT
     user_id
-    , name
+  , name
 
-    , ROW_NUMBER() OVER (
-        PARTITION BY user_id
-        ORDER BY updated_date DESC
-      ) AS details_rank
+  , ROW_NUMBER() OVER (
+      PARTITION BY user_id
+      ORDER BY updated_date DESC
+    ) AS details_rank
 
-  FROM users
-  ```
+FROM users
 
-#### Boolean conditions
+-- Good
+SELECT
+    user_id
+  , name
 
-  * Be explicit in boolean conditions
+  , ROW_NUMBER() OVER w AS details_rank
 
-
-  ```sql
-  -- Good
-  SELECT * FROM customers WHERE is_cancelled = true
-  SELECT * FROM customers WHERE is_cancelled = false
-
-  -- Bad
-  SELECT * FROM customers WHERE is_cancelled
-  SELECT * FROM customers WHERE NOT is_cancelled
-  ```
+FROM users
+WINDOW w AS (
+  PARTITION BY user_id
+  ORDER BY updated_date DESC
+)
+```
