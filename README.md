@@ -4,9 +4,9 @@ The Gemma SQL style describes our SQL, dbt and jinja2 templating approach. We li
 This style guide is already quite long and still cannot cover every intricacy or special case. In general, the reason to have a SQL style guide is to
 - Make our SQL easily readable for ourselves and clients
 - Increase development speed by
-  a) reducing time spent thinking about formatting (it's pre-determined)
-  b) reducing time spend deciphering SQL, whether in PRs or reading your own old code
-  c) avoid slips because missing keywords etc. become more obvious
+  * reducing time spent thinking about formatting (it's pre-determined)
+  * reducing time spend deciphering SQL, whether in PRs or reading your own old code
+  * avoid slips because missing keywords etc. become more obvious
 
 ## Table of contents
 * [Example](#example)
