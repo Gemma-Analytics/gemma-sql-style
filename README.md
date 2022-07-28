@@ -33,8 +33,6 @@ Therefore, if you are unsure about the formatting, try to format in a way that a
     - [Group by order](#group-by-order)
     - [Lateral column aliasing](#lateral-column-aliasing)
   + [CTEs (Common Table Expressions)](#ctes--common-table-expressions-)
-  + [dbt (data build tool)](#dbt--data-build-tool-)
-    - [jinja2 macros](#jinja2-macros)
   + [Small things](#small-things)
     - [Field separation](#field-separation)
     - [Equations](#equations)
@@ -748,88 +746,6 @@ FROM {{ ref('source') }}
 LEFT JOIN sum_agg ON source.id = sum_agg.id
 LEFT JOIN count_agg ON source.id = count_agg.id
 WHERE source.type != 'test'
-```
-
-
-### dbt (data build tool)
-
-#### jinja2 macros
-
-* Keep code [DRY](https://docs.getdbt.com/docs/writing-code-in-dbt/macros/) by using dbt Jinja macros
-* Not only it helps keep the code DRY, it also helps to have complex calculations in one place and maintain it there
-* For alignment: try to make the dbt SQL code readable, not necessarily the compiled SQL code, which is tricky because of the jinja2 whitespacing
-
-
-```sql
--- Good: complex_macro() is always the same SQL function
-
--- the complex_macro in one place:
-{% macro complex_macro() %}
-
-  SUM(revenue*100 - net_error_margin + sidecosts/5)
-
-{% endmacro %}
-
-...
-
-WITH source AS(
-
-  SELECT * FROM {{ ref('source') }}
-
-), revenue_by_date AS(
-
-  SELECT
-      created_date
-
-    , {{ complex_macro() }} AS revenue
-
-  FROM source
-  GROUP BY 1
-
-), revenue_by_type AS(
-
-  SELECT
-      type
-
-    , {{ complex_macro() }} AS revenue
-
-  FROM source
-  GROUP BY 1
-
-)
-
-...
-
-
--- Bad: we have to write and maintain the calculation in multiple areas
-WITH source AS(
-
-  SELECT * FROM {{ ref('source') }}
-
-), revenue_by_date AS(
-
-  SELECT
-      created_date
-
-    , SUM(revenue*100 - net_error_margin + sidecosts/5) AS revenue
-
-  FROM source
-  GROUP BY 1
-
-), revenue_by_type AS(
-
-  SELECT
-      type
-
-    , SUM(revenue*100 - net_error_margin + sidecosts/5) AS revenue
-
-  FROM source
-  GROUP BY 1
-
-)
-
-...
-
 ```
 
 
