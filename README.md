@@ -6,9 +6,9 @@ This style guide is already quite long and still cannot cover every intricacy or
 - Increase development speed by
   * reducing time spent thinking about formatting (it's pre-determined)
   * reducing time spend deciphering SQL, whether in PRs or reading your own old code
-  * avoid slips because missing keywords etc. become more obvious
+  * avoiding slips because missing keywords etc. become more obvious
 
-Therefore, if you are unsure about the formatting, try to format in a way that appears most suitable for the above.
+Therefore, if you are unsure about the formatting, try to format it in a way that appears most suitable for the above.
 
 ## Table of contents
 * [Example](#example)
@@ -17,7 +17,6 @@ Therefore, if you are unsure about the formatting, try to format in a way that a
     - [Keywords](#keywords)
     - [Name conventions](#name-conventions)
     - [Table name conventions](#table-name-conventions)
-    - [Quotation](#quotation)
   + [Line conventions](#line-conventions)
     - [Single line vs multiple line queries](#single-line-vs-multiple-line-queries)
     - [Line character limit](#line-character-limit)
@@ -27,24 +26,20 @@ Therefore, if you are unsure about the formatting, try to format in a way that a
     - [Line order conventions](#line-order-conventions)
   + [Join conventions](#join-conventions)
     - [Join general conventions](#join-general-conventions)
-    - [Join order](#join-order)
   + [Group conventions](#group-conventions)
     - [Group by style](#group-by-style)
-    - [Group by order](#group-by-order)
     - [Lateral column aliasing](#lateral-column-aliasing)
-  + [CTEs (Common Table Expressions)](#ctes--common-table-expressions-)
+  + [CTEs (Common Table Expressions)](#ctes-common-table-expressions)
   + [Small things](#small-things)
-    - [Field separation](#field-separation)
     - [Equations](#equations)
     - [Parenthesis](#parenthesis)
     - [Long list](#long-list)
     - [Long nested functions](#long-nested-functions)
     - [Window functions](#window-functions)
-    - [Boolean conditions](#boolean-conditions)
 
 ## Example
 
-Here's a general query example with most of the guidelines to show a typical query at Gemma Analytics.
+Here's a general query example including most guidelines to show a typical query at Gemma Analytics.
 
 ```sql
 WITH users AS (
@@ -60,7 +55,6 @@ WITH users AS (
   SELECT
       user_id
     , created_date
-
     , COUNT(account_id) AS account_count
 
   FROM accounts
@@ -113,6 +107,8 @@ SELECT * FROM final
 SELECT
     type
   , COUNT(*) AS amount
+
+FROM test
 WHERE type = 'test'
 GROUP BY 1
 
@@ -120,9 +116,10 @@ GROUP BY 1
 select
     type
   , count(*) as amount
+
 from test
 where type = 'test'
-group by user_id
+group by 1
 ```
 
 #### Name conventions
@@ -135,7 +132,7 @@ group by user_id
   * Boolean fields should be appropriately prefixed, e.g. with `is_`, `has_`, `was_`, or `does_`
   * Date fields should be suffixed with `_on` or `_date`
   * Timestamp fields should be suffixed with `_at`
-  * Timestamp or date fields truncated to a period (e.g. year, quarter, month) shoud be suffixed with that period, e.g. `_month`
+  * Timestamp or date fields truncated to a period (e.g. year, quarter, month) should be suffixed with that period, e.g. `_month`
   * Always use `AS` to explicitly alias column names
 
 ```sql
@@ -175,42 +172,10 @@ SELECT
 FROM users
 ```
 
-#### Comments
-
-* One-line comments should use the double-dash syntax
-* Multi-line comments should use the multi-line syntax with a start and end row
-* When writing Jinja in dbt, use Jinja multi-line comments for Jinja-related comments and use SQL comments for SQL-related comments; never use SQL comments in macros!
-
-```sql
--- This is a single line comment
-/*
- *  Multi line comments are beautiful if you use this syntax instead of multiple
- *  single-line comments or, heaven forvid, starting and ending your multi-line
- *  comment in the same line.
- */
-
--- two single line comments
--- are not desirable
-
-/* this is not wanted, either */
-
-/* You could start right away, but it is a matter of beauty and readability to not
-start in the first line and to use the starts on each line to mark the comment */
-
-{# This is a single line Jinja comment - use the multi-line syntax #}
-
-{#
- #  Multi-line Jinja comments are the same syntax but using the same multi-line
- #  comment style. You must not use SQL comments in macros because that would
- #  potentially cause issue if the macro is called in a comment!
- #}
-
-```
-
 #### Table name conventions
 
 * Base/Raw tables/models should be a plural case of the noun, but if not at the very least it should be consistent throughout a repository
-* If table or CTE names are not short and concise, use reasonable and short aliases in queries
+* If table or CTE names are not concise, use reasonable and short aliases in queries
 * If joining the same tables multiple times, try to use aliases relating to the business logic
 
 ```sql
@@ -226,6 +191,7 @@ SELECT * FROM visitLog
 SELECT
     users.name
   , SUM(chrg.amount) AS total_revenue
+
 FROM users
   LEFT JOIN user_charges AS chrg
     ON chrg.user_id = users.user_id
@@ -235,6 +201,7 @@ GROUP BY 1
 SELECT
     u.name
   , COUNT(c.type) AS total_revenue
+
 FROM users u
   LEFT JOIN charges c
     ON c.user_id = u.user_id
@@ -251,13 +218,45 @@ FROM users AS managers
 WHERE NOT employess.id IS NULL
 ```
 
+#### Comments
+
+* One-line comments should use the double-dash syntax
+* Multi-line comments should use the multi-line syntax with a start and end row
+* When writing Jinja in dbt, use Jinja multi-line comments for Jinja-related comments and use SQL comments for SQL-related comments; never use SQL comments in macros!
+
+```sql
+-- This is a single-line comment
+/*
+ *  Multi-line comments are beautiful if you use this syntax instead of multiple
+ *  single-line comments or, heaven forbid, starting and ending your multi-line
+ *  comment in the same line.
+ */
+
+-- two single-line comments
+-- are not desirable
+
+/* this is not wanted, either */
+
+/* You could start right away, but it is a matter of beauty and readability to not
+start in the first line and use beginning of each line to mark the comment */
+
+{# This is a single-line Jinja comment - use the multi-line syntax #}
+
+{#
+ #  Multi-line Jinja comments are the same syntax but use the same multi-line
+ #  comment style. You must not use SQL comments in macros because that would
+ #  potentially cause issues if the macro is called in a comment!
+ #}
+
+```
+
 ### Line conventions
 
-#### Single line vs multi-line queries
+#### Single line vs multiple line queries
 
 ##### Single Line Queries
 
-  * Only use single lines when there's no complexity and all or one thing is selected
+  * Only use single lines when there is no complexity and everything or only one field is selected
 
 ```sql
 -- Good
@@ -339,19 +338,27 @@ SELECT
 FROM users
 ```
 
-#### Line Alignment and Indentation
+#### Line Alignment
 
   * Left align SQL keywords
   * Field names and field calculations are indented
   * Sub-keywords that belong to a keyword group are also indented
   * Every indention level is 1 tab = 2 spaces
-  * The first field name is indented to the same level as the other field names
+  * The first field name is indentation to the same level as the other field names. It is also acceptable to align it with the subsequent commas.
 
 
 ```sql
 -- Good: aligment
 SELECT
     user_id
+  , email
+
+FROM users
+WHERE email LIKE '%@gmail.com'
+
+-- Also acceptable
+SELECT
+  user_id
   , email
 
 FROM users
@@ -367,7 +374,7 @@ SELECT user_id, email
 
   * Each `WHEN`/`ELSE` of a `CASE` statement should be on its own line.
   * The `THEN` can be on the same line as the `WHEN` keyword if it fits the 88 characters limit
-  * If a `WHEN` clause has logical operators, move the conditions to own lines
+  * If a `WHEN` clause has logical operators, move the conditions to their own lines
 
 
 ```sql
@@ -425,12 +432,14 @@ FROM events
 -- good
 SELECT
   *
+
 FROM users
 WHERE user_id = 1234
 
 -- good
 SELECT
   *
+
 FROM users
 WHERE created_at >= '2019-01-01' -- [add a comment why excluding them here]
   AND NOT type = 'test'
@@ -440,6 +449,7 @@ ORDER BY user_id ASC
 -- bad
 SELECT
   *
+
 FROM users
 WHERE created_at >= '2019-01-01' AND type != 'test' AND is_active = true
 ORDER BY user_id ASC
@@ -447,6 +457,7 @@ ORDER BY user_id ASC
 -- good
 SELECT
   *
+
 FROM users
 WHERE created_at >= '2019-01-01'
   AND user_id IN (1234, 2345, 3456, 4567)
@@ -455,6 +466,7 @@ ORDER BY user_id ASC
 -- bad: multiple ORs
 SELECT
   *
+
 FROM users
 WHERE
   created_at >= '2019-01-01' AND (
@@ -467,14 +479,29 @@ ORDER BY user_id ASC
 
 #### Line order conventions
 
-* Primery key first
-* Foregin keys second
+* Primary key first
+* Foreign keys second
 * Attributes next (try to logically group them)
 * Metrics at the end
-* Aggregations are separated by an empty line and added at the end
+* Optional: Aggregations are separated by an empty line and added at the end
 
 
 ```sql
+-- Good
+SELECT
+      user_id
+    , type_id
+    , name
+    , is_active
+    , is_deleted
+    , created_at
+    , signup_date
+    , COUNT(hits) AS number_of_hits
+    , MIN(hit_created_at) AS first_event_date
+
+FROM events
+GROUP BY 1,2,3,4,5,6,7
+
 -- Good
 SELECT
       user_id
@@ -513,7 +540,7 @@ GROUP BY 1,2,4,5,6,7,9
 #### Join general conventions
 
 * All `JOIN`s are `LEFT JOIN`s
-* If we use the `INNER JOIN`, we make it explicit (`INNER JOIN` instead of just `JOIN`), and add a comment why - remember, all `JOIN`s are `LEFT JOIN`s @ Gemma unless there is a specific reason to do otherwise! (to avoid `NULL`s doesn't count as a reason: if `NULL`s are not allowed, you must test for it instead of forcing it)
+* If we use `INNER JOIN`, we make it explicit (`INNER JOIN` instead of just `JOIN`), and add a comment why - remember, all `JOIN`s are `LEFT JOIN`s @ Gemma unless there is a specific reason to do otherwise! (to avoid `NULL`s doesn't count as a reason: if `NULL`s are not allowed, you must test for it instead of forcing it)
 * If we use the `CROSS JOIN`, we make it explicit and add a comment, except for `JSONB` functions such as `JSONB_ARRAY_ELEMENTS()`, which can be cross-joined using the comma notation
 * Naming of aliases, see [Table name conventions](#table-name-conventions)
 * `JOIN`s are part of the `FROM` keyword group and must be indented accordingly
@@ -524,7 +551,6 @@ GROUP BY 1,2,4,5,6,7,9
 -- Good
 SELECT
     users.name
-
   , COUNT(pm.method_id) AS number_of_payment_methods
 
 FROM users
@@ -547,6 +573,7 @@ GROUP BY 1
 SELECT
     managers.name
   , employees.name
+
 FROM users AS managers
   LEFT JOIN users AS employees
     ON employees.manager_id = managers.id
@@ -569,7 +596,7 @@ GROUP BY 1
 #### Group by style
 
   * If at all possible, group by referencing the column position(s) with integers
-  * Try to use as few as possible `GROUP BY` fields. Its a bad sign if you
+  * Try to use as few as possible `GROUP BY` fields. It is a bad sign if you
     group by more than 2-3 fields. Use CTEs instead. Have a read:
     [group-by-1](https://blog.getdbt.com/write-better-sql-a-defense-of-group-by-1/)
   * In very rare cases it may be necessary to add a field name to the `GROUP BY` fields, in that case add the explicit column name after the integers
@@ -580,7 +607,6 @@ GROUP BY 1
 SELECT
     created_date
   , type
-
   , COUNT(*) AS users_count
 
 FROM users
@@ -590,7 +616,6 @@ GROUP BY 1, 2
 SELECT
     created_date
   , user_id
-
   , COUNT(*) AS users_count
 
 FROM users
@@ -600,7 +625,6 @@ GROUP BY created_date, user_id
 SELECT
       created_date
     , type
-
     , COUNT(*) AS users_count
 
 FROM users
@@ -616,7 +640,6 @@ GROUP BY 1, type
 -- Good
 SELECT
     TIMESTAMP_TRUNC(created_at, year) AS signup_year
-
   , COUNT(*) AS total_users
 
 FROM users
@@ -625,7 +648,6 @@ GROUP BY 1
 -- Bad
 SELECT
     TIMESTAMP_TRUNC(created_at, year) AS signup_year
-
   , COUNT(*) AS total_users
 
 FROM users
@@ -644,6 +666,7 @@ WITH test_users AS (
 
   SELECT
     *
+
   FROM {{ ref('users') }}
   WHERE type = 'test'
 
@@ -654,6 +677,7 @@ SELECT COUNT(*) FROM test_users
 -- Bad
 SELECT
   COUNT(*)
+
 FROM (
   SELECT
     *
@@ -663,7 +687,7 @@ FROM (
 ```
 
 * Starting and closing CTE parentheses are on the same line if you have multiple CTEs (easier to out-comment)
-* dbt: Always have clean "import" CTEs that just reference to other dbt models at the start - this way you make it clear which models are references, and the sources are reusable for different calculations within the query
+* dbt: Always have clean "import" CTEs that consist just of a reference to other dbt models at the start - this way you make it clear which models are references, and the sources are reusable for different calculations within the query
 * Optional: When using CTEs, have a final CTE called "final" at the end of the model
 
 
@@ -677,7 +701,6 @@ WITH orders AS(
 
   SELECT
       user_id
-
     , SUM(revenue) AS rev_per_id
 
   FROM orders
@@ -687,7 +710,6 @@ WITH orders AS(
 
   SELECT
       user_id
-
     , COUNT(*) AS total_by_id
 
   FROM orders
@@ -717,7 +739,6 @@ sum_agg AS(
 
   SELECT
     id
-
     , SUM(revenue) AS rev_per_id
 
   FROM {{ ref('source') }}
@@ -729,7 +750,6 @@ count_agg AS(
 
   SELECT
     id
-
     , COUNT(*) AS total_by_id
 
   FROM {{ ref('source') }}
@@ -751,38 +771,9 @@ WHERE source.type != 'test'
 
 ### Small things
 
-#### Field separation
-
-* Put the commas to the beginning of the line
-* Start the first field in line with the other fields
-
-```sql
--- Good
-SELECT
-      user_id
-    , type
-    , created_at
-
-FROM users
-
--- Bad
-SELECT
-  user_id
-  , type
-
-FROM users
-
--- Bad
-SELECT
-  user_id,
-  type
-
-FROM users
-```
-
 #### Equations
 
-* Use `NOT a = b` over `a <> b` (simply because its more readable)
+* Use `NOT a = b` or `a != b` over `a <> b` (simply because its more readable)
 
 
 ```sql
@@ -796,19 +787,21 @@ WHERE NOT type = 'test'
 
 #### Parenthesis
 
-* Avoid spaces inside of parenthesis
+* Avoid spaces inside of parentheses
 
 
 ```sql
 -- Good
 SELECT
   *
+
 FROM users
 WHERE user_id IN (1, 2)
 
 -- Bad
 SELECT
   *
+
 FROM users
 WHERE user_id IN ( 1, 2 )
 ```
@@ -822,6 +815,7 @@ WHERE user_id IN ( 1, 2 )
 -- Good
 SELECT
   *
+  
 FROM users
 WHERE email in ( -- here you can have either trailing or leading commas
   'user-1@example.com',
@@ -864,7 +858,7 @@ FROM users
 
 #### Window functions
 
-* You can leave it all on its own line or break it up into multiple depending on its length ([Line character limit](#line-character-limit))
+* You can leave it on its own line or break it up into multiple ones depending on its length ([Line character limit](#line-character-limit))
 * If the window is long, or used more than once, consider defining it using the `WINDOW` keyword
 
 ```sql
@@ -872,7 +866,6 @@ FROM users
 SELECT
     user_id
   , name
-
   , ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY updated_date DESC)
     AS details_rank
 
@@ -882,7 +875,6 @@ FROM users
 SELECT
     user_id
   , name
-
   , ROW_NUMBER() OVER (
       PARTITION BY user_id
       ORDER BY updated_date DESC
@@ -894,7 +886,6 @@ FROM users
 SELECT
     user_id
   , name
-
   , ROW_NUMBER() OVER w AS details_rank
 
 FROM users
