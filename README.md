@@ -256,7 +256,7 @@ start in the first line and use beginning of each line to mark the comment */
 
 ##### Single Line Queries
 
-  * Only use single lines when there is no complexity and everything or only one thing is selected
+  * Only use single lines when there is no complexity and everything or only one field is selected
 
 ```sql
 -- Good
@@ -344,7 +344,7 @@ FROM users
   * Field names and field calculations are indented
   * Sub-keywords that belong to a keyword group are also indented
   * Every indention level is 1 tab = 2 spaces
-  * The first field name is indentation to the same level as the other field names. Also acceptable to align it with the subsequent commas.
+  * The first field name is indentation to the same level as the other field names. It is also acceptable to align it with the subsequent commas.
 
 
 ```sql
@@ -687,7 +687,7 @@ FROM (
 ```
 
 * Starting and closing CTE parentheses are on the same line if you have multiple CTEs (easier to out-comment)
-* dbt: Always have clean "import" CTEs that just a reference to other dbt models at the start - this way you make it clear which models are references, and the sources are reusable for different calculations within the query
+* dbt: Always have clean "import" CTEs that consist just of a reference to other dbt models at the start - this way you make it clear which models are references, and the sources are reusable for different calculations within the query
 * Optional: When using CTEs, have a final CTE called "final" at the end of the model
 
 
