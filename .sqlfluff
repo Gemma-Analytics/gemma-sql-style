@@ -1,0 +1,17 @@
+[sqlfluff]
+dialect = ansi
+exclude_rules = L022
+
+[sqlfluff:indentation]
+indented_joins = True
+
+[sqlfluff:layout:type:comma]
+line_position = leading
+
+[sqlfluff:rules]
+tab_space_size = 2
+max_line_length = 88
+capitalisation_policy = upper
+
+[sqlfluff:templater:jinja:macros]
+some_dbt_macro_def = {% macro some_dbt_macro() %} some_column_name {% endmacro %}
