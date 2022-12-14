@@ -10,9 +10,10 @@ This style guide is already quite long and still cannot cover every intricacy or
 
 Therefore, if you are unsure about the formatting, try to format it in a way that appears most suitable for the above.
 
+
 ## Table of contents
 * [Example](#example)
-* [Guidelines](#guidelines)
+* [SQL Guidelines](#sql-guidelines)
   + [General conventions](#general-conventions)
     - [Keywords](#keywords)
     - [Name conventions](#name-conventions)
@@ -36,6 +37,14 @@ Therefore, if you are unsure about the formatting, try to format it in a way tha
     - [Long list](#long-list)
     - [Long nested functions](#long-nested-functions)
     - [Window functions](#window-functions)
+* [dbt Guidelines](#dbt-guidelines)
+  + [Model naming](#model-naming)
+  + [Model configuration](#model-configuration)
+  + [Modeling](#modeling)
+  + [Testing](#testing)
+  + [Documentation](#documentation)
+  + [YAML Style Guide](#yaml-style-guide)
+  + [Jinja Style Guide](#jinja-style-guide)
 
 ## Example
 
@@ -92,7 +101,7 @@ WITH users AS (
 SELECT * FROM final
 ```
 
-## Guidelines
+## SQL Guidelines
 
 ### General conventions
 
@@ -893,4 +902,264 @@ WINDOW w AS (
   PARTITION BY user_id
   ORDER BY updated_date DESC
 )
+```
+
+
+## dbt guidelines
+
+### Model naming 
+
+* The file and naming structure is as follows:
+```
+analytics
+├── dbt_project.yml
+└── models
+    ├── base
+    |    └── stripe
+    |        ├── sources.yml
+    |        ├── schema.yml
+    |        ├── base_stripe_customers.sql
+    |        └── base_stripe_invoices.sql
+    ├── interim (optional)
+    |       └── schema.yml
+    |       └── customers_all.sql
+    ├── analytics
+    |   └── core # optional folder names
+    |   |   └── schema.yml
+    |   |   └── dim_customers.sql
+    |   |   └── fact_orders.sql
+    |   └── marketing # optional folder names
+    ├── reporting (optional)
+    |       └── daily_management_metrics.sql
+    └── export
+        └── braze #reverse etl schema
+```
+* All objects should be plural, such as: `base_stripe_invoices`
+
+* Base tables are prefixed with `base_`, such as: `base_<source>_<object>`
+
+* Analytics tables are categorized between facts and dimensions with a prefix that indicates either, such as: `fact_orders` or `dim_customers`
+
+* Table names should reflect granularity e.g. `orders` should have one order per row and `daily_orders` should have one day per row.
+
+* Reporting tables should refer to specific reports or KPIs that are used for the visualisation tool
+
+* Export tables hold data will be loaded into third-party tools via a reverse ETL process (db service users of the tools should only have access to that schema)
+
+
+### Model configuration
+
+* If a particular configuration applies to all models in a directory, it should be specified in the `dbt_project.yml` file.
+
+* The default materialization should be tables.
+
+* Model-specific attributes (like sort/dist keys) should be specified in the model.
+
+* In-model configurations should be specified like this at the top of the model:
+```
+{{
+  config(
+    materialized = 'table',
+    sort = 'id',
+    dist = 'id'
+  )
+}}
+```
+
+### Modeling
+
+* Only `base_` models should select from sources.
+
+* All other models should only select from other models.
+
+* CTEs that are duplicated across models should be pulled out into their own models.
+
+* Only `base_` models should:
+
+  * rename fields to meet above naming standards.
+
+  * cast foreign keys and other fields so they can be used uniformly across the project.
+
+  * contain minimal transformations that are 100% guaranteed to be useful for the foreseeable future. An example of this is parsing out the Salesforce ID from a field known to have messy data.
+
+  * If you need more complex transformations to make the source useful, consider adding an `interim_` table.
+
+* Only `interim_` models should:
+
+  * use aggregates, window functions, joins necessary to clean data for use in upstream models.
+
+  * contain transformations that fundamentally alter the meaning of a column.
+
+### Testing
+
+* The primary key of each model must be tested with `unique` and `not_null` tests. 
+
+* Use the [dbt utils](https://github.com/dbt-labs/dbt-utils/tree/0.1.7/#schema-tests) and [great expectations](https://github.com/calogica/dbt-expectations/tree/0.1.2/) community packages for tests.
+
+* Source models:
+
+  * Freshness [tests](https://docs.getdbt.com/reference/resource-properties/freshness) help monitor sources where the ETL tool does not allow for this.
+```
+version: 2
+
+sources:
+  - name: stripe
+    freshness:
+      warn_after:
+        count: 1
+        period: day
+      error_after:
+        count: 36
+        period: hour
+    loaded_at_field: _sdc_extracted_at
+```
+  * Additional column value tests can be added to ensure that data inputs conform to your expectations.
+
+ * Distributional [tests](https://github.com/calogica/dbt-expectations/tree/0.1.2/#distributional-functions) help monitor unreliable ETL sources.
+
+* Transformations should:
+
+  * be validated in the BI tool, preferably against a predefined acceptance criteria.
+
+  * Additional column value tests are recommended for `interim_` tables and complex transformations.
+
+### Documentation
+
+* Depending on the BI tool, tables that are exposed in the BI tool should be documented for end users. Whenever possible, reporting table documentation should contain the metadata needed to sync dbt documentation from the dbt `.yml` file to the reporting tool. 
+
+  * Explain what the table contains – e.g. `fact_orders` described as `Represents an individual order`.
+
+  * Note what was filtered out from the table.
+
+  * Primary keys and foreign keys do not need to be documented if their origin is clear – e.g. `shopify_customer_id` will not be mixed up with `stripe_customer_id`.
+
+ * Add an explanation to every new field that was not in the source table:
+
+   * Explain how metrics are calculated.
+
+   * Specify the origin of new dimension fields – e.g. if you generated a label called `market` that uses a `COALESCE` between shipping and billing country names, explain that.
+
+* Pro tip: you can copy and paste documentation from Fivetran’s dbt [packages](https://hub.getdbt.com/), which cover many sources   
+
+* For source tables, we will rely on the API documentation. Optionally, you can add a link to the ETL repo.
+
+* For seeds relying on GoogleSheets, add the URL the documentation for debugging failures.
+
+* Use inline comments for any confusing or implicit logic that cannot be understood from the code alone.
+
+### YAML style guide
+
+* Indents should be two spaces
+
+* List items should be indented
+
+* Use a new line to separate list items that are dictionaries where appropriate
+```
+version: 2
+
+models:
+  - name: events
+    columns:
+      - name: event_id
+        description: This is a unique identifier for the event
+        tests:
+          - unique
+          - not_null
+
+      - name: event_time
+        description: "When the event occurred in UTC (eg. 2018-01-01 12:00:00)"
+        tests:
+          - not_null
+
+      - name: user_id
+        description: The ID of the user who recorded the event
+        tests:
+          - not_null
+          - relationships:
+              to: ref('users')
+              field: id
+```
+### Jinja style guide
+
+* When using Jinja delimiters, use spaces on the inside of your delimiter, like `{{ this }}` instead of `{{this}}`
+
+* Use newlines to visually indicate logical blocks of Jinja.
+
+* Keep code [DRY](https://docs.getdbt.com/docs/building-a-dbt-project/jinja-macros) by using dbt Jinja macros.
+
+* Not only it helps keep the code DRY, it also helps to have complex calculations in one place and maintain it there.
+
+* Be mindful of excessive `for` loops that create performance issues in SQL.
+
+* For alignment: try to make the dbt SQL code readable, not necessarily the compiled SQL code, which is tricky because of the jinja2 whitespacing
+```
+-- Good: complex_macro() is always the same SQL function
+
+-- the complex_macro in one place:
+
+{% macro complex_macro() %}
+
+  SUM(revenue*100 - net_error_margin + sidecosts/5)
+
+{% endmacro %}
+
+...
+
+WITH source AS(
+
+  SELECT * FROM {{ ref('source') }}
+
+), revenue_by_date AS(
+
+  SELECT
+      created_date
+
+    , {{ complex_macro() }} AS revenue
+
+  FROM source
+  GROUP BY 1
+
+), revenue_by_type AS(
+
+  SELECT
+      type
+
+    , {{ complex_macro() }} AS revenue
+
+  FROM source
+  GROUP BY 1
+
+)
+
+...
+
+
+-- Bad: we have to write and maintain the calculation in multiple areas
+WITH source AS(
+
+  SELECT * FROM {{ ref('source') }}
+
+), revenue_by_date AS(
+
+  SELECT
+      created_date
+
+    , SUM(revenue*100 - net_error_margin + sidecosts/5) AS revenue
+
+  FROM source
+  GROUP BY 1
+
+), revenue_by_type AS(
+
+  SELECT
+      type
+
+    , SUM(revenue*100 - net_error_margin + sidecosts/5) AS revenue
+
+  FROM source
+  GROUP BY 1
+
+)
+
+...
 ```
