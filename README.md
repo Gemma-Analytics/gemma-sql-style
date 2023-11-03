@@ -224,7 +224,7 @@ SELECT
 FROM users AS managers
   LEFT JOIN users AS employees
     ON employees.manager_id = managers.id
-WHERE NOT employess.id IS NULL
+WHERE NOT employees.id IS NULL
 ```
 
 #### Comments
@@ -607,7 +607,7 @@ GROUP BY 1
   * If at all possible, group by referencing the column position(s) with integers
   * Try to use as few as possible `GROUP BY` fields. It is a bad sign if you
     group by more than 2-3 fields. Use CTEs instead. Have a read:
-    [group-by-1](https://blog.getdbt.com/write-better-sql-a-defense-of-group-by-1/)
+    [group-by-1](https://www.getdbt.com/blog/write-better-sql-a-defense-of-group-by-1)
   * In very rare cases it may be necessary to add a field name to the `GROUP BY` fields, in that case add the explicit column name after the integers
 
 
@@ -1043,7 +1043,7 @@ sources:
 
 * For source tables, we will rely on the API documentation. Optionally, you can add a link to the ETL repo.
 
-* For seeds relying on GoogleSheets, add the URL the documentation for debugging failures.
+* For seeds relying on GoogleSheets, add the URL to the documentation for debugging failures.
 
 * Use inline comments for any confusing or implicit logic that cannot be understood from the code alone.
 
