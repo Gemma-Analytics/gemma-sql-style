@@ -37,6 +37,7 @@ Therefore, if you are unsure about the formatting, try to format it in a way tha
     - [Long list](#long-list)
     - [Long nested functions](#long-nested-functions)
     - [Window functions](#window-functions)
+* [Linting SQL using SQLFluff](#sql-fluff)
 * [dbt Guidelines](#dbt-guidelines)
   + [Model naming](#model-naming)
   + [Model configuration](#model-configuration)
@@ -903,6 +904,12 @@ WINDOW w AS (
   ORDER BY updated_date DESC
 )
 ```
+
+## Formatting SQL using SQLFluff
+* [SQL Fluff](https://docs.sqlfluff.com/en/stable/index.html) is a tool that parses your SQL files, outputs errors based on the config file you define, with an option to auto-format some of them.
+* Others can't be fixed automatically because logic needs to be applied. However, you will at least be notified about the errors and can still decide on a case to case basis.
+* Feel free to use the `.sqlfluff` config file saved in this repo. It holds many rules compliant to Gemma SQL style. Keep in mind that the formatter will only bring you closer to the goal but can not detect 100% of violations. There are undecisive edge cases, eg. if indentation of the first column should be aligned with the following leading comma or the following field reference. This can be decided by personal preference and those type of errors can be ignored.
+* It is still super helpful for small violations like trailing white space or comma alignment.
 
 
 ## dbt guidelines
