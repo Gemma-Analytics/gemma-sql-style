@@ -105,6 +105,7 @@ line_position = leading
 [sqlfluff:layout:type:comma]
 line_position = leading
 [sqlfluff:rules:layout.long_lines]
+ignore_comment_lines = True
 ignore_comment_clauses = True
 [sqlfluff:rules:layout.functions]
 [sqlfluff:rules:layout.cte_bracket]
@@ -123,6 +124,7 @@ ignore_comment_clauses = True
 quoted_identifiers_policy = all
 unquoted_identifiers_policy = all
 ignore_comment_lines = True
+ignore_comment_clauses = True
 ignore_words = final
 [sqlfluff:rules:references.special_chars]
 [sqlfluff:rules:references.quoting]
