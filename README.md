@@ -1,0 +1,2 @@
+# Gemma-SQL-Style (archived)
+This repo has been archived and **the style guide has been moved** to the [best practices repository](https://github.com/Gemma-Analytics/gemma-best-practices/blob/main/2_transform/my_dbt_project/dbt_style_guide.md#dbt-style-guide).
