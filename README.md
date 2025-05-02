@@ -134,11 +134,12 @@ group by 1
 
 #### Name conventions
 
-  * Don't use reserved keywords such as `join`, `from` etc.
+  * Don't use reserved keywords such as `join`, `from`, etc.
   * Use snake_case (all lowercase, only letters and underscores, starting with a letter)
   * Rename fields if source tables do not adhere to these naming conventions
-  * A primary key column should be called `id`
-  * Renaming should be on lowest dbt model level -> base models
+  * Every table must define its primary key explicitly from the start using a descriptive name like `user_id`, `item_id`, etc.
+  * Naming should be consistent across the repo to clearly identify the origin of each field.
+  * Renaming should be on the lowest dbt model level -> base models
   * Boolean fields should be appropriately prefixed, e.g. with `is_`, `has_`, `was_`, or `does_`
   * Date fields should be suffixed with `_on` or `_date`
   * Timestamp fields should be suffixed with `_at`
