@@ -23,7 +23,7 @@ It does not cover SQL & jinja style, which are covered by the [Gemma SQL Style G
   + [Model-level documentation](#model-level-documentation/)
   + [Column-level documentation](#column-level-documentation/)
   + [Tests documentation](#tests-documentation/)
-  + [In-line documentation](in-line-documentation)
+  + [In-line documentation](#in-line-documentation)
 * [YAML Style Guide](#yaml-style-guide)
 * [Jinja Style Guide](#jinja-style-guide)
 
@@ -81,57 +81,57 @@ gemma-analytics
 ```
 All transformation models are housed in the models/ folder and follow a layered structure that enforces a clean, directional flow of data. Models should flow from base → interim → reporting → export, with no reverse dependencies.
 
-> A clear folder structure in dbt ensures clean data flow, improves maintainability, and supports best practices. It also enables folder-level configurations (e.g., materializations), permissions (ex. only finance should have access to specific tables) and allows you to run or test specific parts of the project (e.g., `dbt run --s reporting/` ).
+> A clear folder structure in dbt ensures clean data flow, improves maintainability, and supports best practices. It also enables folder-level configurations (e.g., materializations), permissions (e.g. only finance should have access to specific tables) and allows you to run or test specific parts of the project (e.g., `dbt run --s reporting/` ).
 
 ### base/
-The purpose of this layer is to isolate and standardize raw data before any business logic is applied. These are aw source models, one-to-one with source tables (e.g., Stripe). 
+The purpose of this layer is to isolate and standardize raw data before any business logic is applied. These are raw source models, one-to-one with source tables (e.g., Stripe). 
 The transformations in the base layer should be:
-- Field renaming
-- Type casting (*Always make sure to cast ids to string!*)
-- Light cleaning (e.g., date parsing)
+* Field renaming
+* Type casting (*Always make sure to cast ids to string!*)
+* Light cleaning (e.g., date parsing)
 
 There should be one folder per source with:
-- The related base models
-- The `base_<source>_docs foder`, containing the md files of the models
-- The `base_<source>_schemas folder`, containing the yml files of the models
-- The `sources.yml` files for that source
+* The related base models
+* The `base_<source>_docs folder`, containing the md files of the models
+* The `base_<source>_schemas folder`, containing the yml files of the models
+* The `sources.yml` files for that source
 
 ### interim/
 The interim layer serves as a preparatory stage between raw base models and final reporting models. It’s where we do the heavy lifting of business logic, including:
-- Applying complex cleaning logic
-- Joining multiple models
-- Staging reusable logic used across multiple reporting models
-- Calculating derived fields that aren’t raw but also aren’t aggregates
-- Preparing data before aggregations
+* Applying complex cleaning logic
+* Joining multiple models
+* Staging reusable logic used across multiple reporting models
+* Calculating derived fields that aren’t raw but also aren’t aggregates
+* Preparing data before aggregations
 
 The folder structure for the interim/ layer depends on the number of data sources and the complexity of your transformations and use cases.
 A few common structures include:
-- By data source (e.g. `stripe/`, `shopify/`, `braze/`)
-- By domain or subject area, if that better reflects the business use cases (ex. `marketing/`)
+* By data source (e.g. `stripe/`, `shopify/`, `braze/`)
+* By domain or subject area, if that better reflects the business use cases (e.g. `marketing/`)
 
 What is important is to keep folder-level permissions and configs in mind when deciding and choose a structure that makes it easy to:
-- Understand where logic lives
-- Reuse and test components easily
-- Onboard quickly without guesswork
+* Understand where logic lives
+* Reuse and test components easily
+* Onboard quickly without guesswork
 
 ### reporting/
 This layer contains production-grade models exposed to downstream tools and stakeholders.
 Keep the reporting/core layer as lean as possible, it should mainly contain final aggregations and reshaped outputs for BI tools or business users. All the intermediate wrangling, logic, and transformations should happen in interim.
 This approach promotes:
-- Reusability: The same interim model can feed multiple reporting models.
-- Modularity: Each model does one thing well.
-- Debuggability: Easier to test and trace logic in isolation.
+* Reusability: The same interim model can feed multiple reporting models.
+* Modularity: Each model does one thing well.
+* Debuggability: Easier to test and trace logic in isolation.
 
 The folder structure should be:
-- `core/fact/`: Central fact tables like fact_orders
-- `core/dim/`: Dimension tables like dim_customers
-- `<department/use case>/` (optional): Subject-specific reporting such as `profit_and_loss.sql`
+* `core/fact/`: Central fact tables like fact_orders
+* `core/dim/`: Dimension tables like dim_customers
+* `<department/use case>/` (optional): Subject-specific reporting such as `profit_and_loss.sql`
 
 ### export/
 The export layer contains models specifically designed to prepare data for syncing back into external operational tools — such as CRM platforms (e.g., Salesforce, HubSpot), marketing automation tools (e.g., Braze, Klaviyo), or customer support systems (e.g., Zendesk). 
 These models should not introduce new business logic, they are purely about formatting and structuring data for delivery to external systems. All logic should already be handled upstream in interim or reporting.
 
-The folder structure should be by target tool (ex. `salesforce/ `, `klaviyo/ `)
+The folder structure should be by target tool (e.g. `salesforce/`, `klaviyo/`)
 
 ## Model naming 
 Consistent and descriptive model names are essential for a maintainable dbt project. Good naming helps quickly understand a model’s purpose, fits naturally into documentation and lineage graphs, and makes it easier to debug, extend, or reuse models over time.
@@ -149,14 +149,14 @@ The key best-practices to follow when naming models are the following:
 
 * Non-core reporting tables should refer to specific reports or KPIs that are used for the visualisation tool
 
-* Export tables hold data will be loaded into third-party tools via a reverse ETL process (db service users of the tools should only have access to that schema)
+* Export tables hold data that will be loaded into third-party tools via a reverse ETL process (db service users of the tools should only have access to that schema)
 
 ## Model configuration
 Model configurations in dbt control how your models are built, stored, and described. They’re an important part of keeping your project efficient and aligned with how the data should be used.
 
 You can set configurations:
-- Globally by folder in dbt_project.yml (great for setting defaults like ephemeral for interim models)
-- Locally within a model using {{ config(...) }} (useful for exceptions or overrides)
+* Globally by folder in dbt_project.yml (great for setting defaults like ephemeral for interim models)
+* Locally within a model using {{ config(...) }} (useful for exceptions or overrides)
 
 > Guideline: Set sensible defaults at the folder level and override them at the model level only when necessary, consistency keeps the project easier to reason about.
 
@@ -250,9 +250,9 @@ sources:
 Snapshots are used to track how specific rows in a table evolve over time, making them ideal for capturing slowly changing dimensions (SCDs) such as customer status, subscription tier, or pricing plans.
 
 That said, not every table needs a snapshot. They are best used when:
-- The source system doesn’t maintain historical data
-- You need to track field-level changes
-- You want to know what changed and when
+* The source system doesn’t maintain historical data
+* You need to track field-level changes
+* You want to know what changed and when
 
 > Guideline: Think of snapshots as **immutable history logs**. They should be kept simple and direct: avoid applying filters, transformations, or joins. Introducing logic into snapshots adds complexity and can obscure the actual changes in the data.
 
@@ -261,26 +261,26 @@ This ensures you capture the original state of the data without relying on any u
 
 > Cleaning or correcting a broken snapshot is very tricky, it's better to snapshot cleanly and simply from the start.
 
-### Documentation
+## Documentation
 
 Documentation is just as important as clean SQL or proper testing. It isn’t just about writing descriptions; it’s about creating a living, breathing map of your data transformations. Good documentation:
-- Provides clarity on data lineage - Traces data from source to consumption
-- Helps new team members understand complex transformations - Reduces onboarding time
-- Acts as a self-service resource for analysts and stakeholders - Reduces ad-hoc questions
-- Supports data governance and compliance efforts - Critical for regulated industries
-- Improves data quality - Well-documented data is typically better understood and maintained
+* Provides clarity on data lineage - Traces data from source to consumption
+* Helps new team members understand complex transformations - Reduces onboarding time
+* Acts as a self-service resource for analysts and stakeholders - Reduces ad-hoc questions
+* Supports data governance and compliance efforts - Critical for regulated industries
+* Improves data quality - Well-documented data is typically better understood and maintained
 
 In this section, we focus on four key types of documentation:
-- **Model-level documentation** - what the model represents
-- **Column-level documentation** — what each field represents
-- **Tests documentation** - what is being tested and how to debug failures
-- **In-code documentation** — why the logic / model is written the way it is
+* **Model-level documentation** — what the model represents
+* **Column-level documentation** — what each field represents
+* **Tests documentation** — what is being tested and how to debug failures
+* **In-code documentation** — why the logic / model is written the way it is
 
 Depending on the BI tool, tables and fields that are exposed in the BI tool should be documented for end users. Whenever possible, reporting table documentation should contain the metadata needed to sync dbt documentation from the dbt `.yml` file or model configs to the reporting tool.
 
 > Check out the [Automated documentation confluence page](https://gemmaanalytics.atlassian.net/wiki/spaces/TEC/pages/2711420951/Automated+dbt+documentation+with+dbt-invoke-gemma) to test automating the process with the gemma-dbt-invoke package (note that the package is still in the testing phase)
 
-#### Model-level documentation
+### Model-level documentation
 
 The model-level documentation should live in the `<model_name>.yml` file in the related `<path>_schemas` folder.
 
@@ -288,7 +288,7 @@ The model-level documentation should live in the `<model_name>.yml` file in the 
 * Explain what the table contains – e.g. `fact_orders` described as `Represents an individual order`.
 * Note what was filtered out from the table.
 * For source tables, we will rely on the API documentation. Optionally, you can add a link to the ETL repo.
-* Use the meta field to to store additional model-level information that can be used internally or by external tools like data catalogs and dashboards. This structured metadata can improve documentation and enable automation.
+* Use the meta field to store additional model-level information that can be used internally or by external tools like data catalogs and dashboards. This structured metadata can improve documentation and enable automation.
 * For models relying on GoogleSheets, add the URL to the documentation for debugging failures.
 
 **Example**
@@ -315,9 +315,9 @@ models:
         ...
 ```
 
-#### Column-level documentation
+### Column-level documentation
 
-The fiel-level documentation should be filled out in the `<model_name>.md` file in the related `<path>_docs` folder of the model which it is created and added to the  `<model_name>.yml` file in the related `<path>_schemas` folder for all models in which the column appears. This allows to document individual columns with precise, informative descriptions. It’s very useful because each time you want to document the `net_sales` column in different models I can use the {{ doc() }} function
+The field-level documentation should be filled out in the `<model_name>.md` file in the related `<path>_docs` folder of the model which it is created and added to the  `<model_name>.yml` file in the related `<path>_schemas` folder for all models in which the column appears. This allows to document individual columns with precise, informative descriptions. It’s very useful because each time you want to document the `net_sales` column in different models I can use the {{ doc() }} function
 
 **Best Practices**
 * Pro tip: you can copy and paste documentation from Fivetran’s dbt [packages](https://hub.getdbt.com/), which cover many sources 
@@ -372,20 +372,20 @@ The field-level documentation can be pushed to the DHW with the following code s
       
 ```
 
-#### Tests documentation
+### Tests documentation
 Tests are only valuable if people understand what they check and why they exist. Documenting your tests helps teams debug faster, avoid redundant or conflicting checks, and maintain trust in the data quality framework. Test descriptions can also be used to push alerts directly to stakeholders to keep them informed or when the issue lies in wrong manual input in the source data.
 
 We document tests in two places:
-- **In `.yml` files generic tests** 
-- **In the `.sql` file for custom tests** 
+* **In `.yml` files generic tests**
+* **In the `.sql` file for custom tests**
 
 **Best Practices**
 Add info on:
-- What is being tested
-- likely failure reasons
-- how to troubleshoot 
-- who 'owns' the troubleshooting
-- who should be alerted
+* What is being tested
+* Likely failure reasons
+* How to troubleshoot
+* Who 'owns' the troubleshooting
+* Who should be alerted
 
 > Pro tip: If you add this info as `meta` fields it can be easily added to alert failures and/or data quality dashboards
 
@@ -443,12 +443,12 @@ SELECT * FROM {{ ref("fact_order_lines") }}
 WHERE ABS(net_revenue - (gross_revenue - discount_amount)) > 0.01
 ```
   
-#### In-line documentation
+### In-line documentation
 Clear in-line documentation is essential to:
-- Help your future self and teammates understand logic and intent without reverse-engineering SQL
-- Speed up onboarding of new team members or external collaborators
-- Support better debugging and maintenance when business logic changes
-- Complement dbt's structured YAML documentation with technical helpful context and commentary
+* Help your future self and teammates understand logic and intent without reverse-engineering SQL
+* Speed up onboarding of new team members or external collaborators
+* Support better debugging and maintenance when business logic changes
+* Complement dbt's structured YAML documentation with technical helpful context and commentary
 
 **Best Practices**
 * Add comments for any confusing or implicit logic that cannot be understood from the code alone.
