@@ -149,10 +149,11 @@ group by 1
     | Field type | English | German |
     | --- | --- | --- |
     | Boolean | `is_`, `has_`, `was_`, `does_` | `ist_`, `hat_`, `war_` |
-    | Date | `_on`, `_date` | `_datum` |
-    | Timestamp | `_at` | `_am` |
+    | Date | `_on`, `_date` | `_am`, `_datum` |
+    | Timestamp | `_at` | `_um` |
     | Truncated period | `_month`, `_quarter`, `_year` | `_monat`, `_quartal`, `_jahr` |
-    | Count | `_count` | `_anzahl` |
+
+    Write umlauts and ß as `ae`, `oe`, `ue` and `ss`, e.g. `stueckzahl`, `groesse`, `strasse`.
 
   * Always use `AS` to explicitly alias column names
 
@@ -172,8 +173,7 @@ SELECT
     kunde_id AS id -- primary key
   , ist_aktiv -- type: boolean
   , beginn_datum -- type: date
-  , erstellt_am -- type: timestamp with time zone
-  , bestellungen_anzahl -- type: integer
+  , erstellt_um -- type: timestamp with time zone
 
 FROM kunden
 
@@ -183,7 +183,6 @@ SELECT
   , is_aktiv
   , beginn_date
   , erstellt_at
-  , bestellungen_count
 
 FROM kunden
 
