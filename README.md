@@ -144,6 +144,17 @@ group by 1
   * Date fields should be suffixed with `_on` or `_date`
   * Timestamp fields should be suffixed with `_at`
   * Timestamp or date fields truncated to a period (e.g. year, quarter, month) should be suffixed with that period, e.g. `_month`
+  * Write all names of a project in one language. In a German project, use the German form of the prefixes and suffixes above, so that no name mixes two languages:
+
+    | Field type | English | German |
+    | --- | --- | --- |
+    | Boolean | `is_`, `has_`, `was_`, `does_` | `ist_`, `hat_`, `war_` |
+    | Date | `_on`, `_date` | `_am`, `_datum` |
+    | Timestamp | `_at` | `_um` |
+    | Truncated period | `_month`, `_quarter`, `_year` | `_monat`, `_quartal`, `_jahr` |
+
+    Write umlauts and ß as `ae`, `oe`, `ue` and `ss`, e.g. `stueckzahl`, `groesse`, `strasse`.
+
   * Always use `AS` to explicitly alias column names
 
 ```sql
@@ -156,6 +167,24 @@ SELECT
   , created_at -- time: timestamp with time zone
 
 FROM users
+
+-- Good: field names in a German project
+SELECT
+    kunde_id AS id -- primary key
+  , ist_aktiv -- type: boolean
+  , beginn_datum -- type: date
+  , erstellt_um -- type: timestamp with time zone
+
+FROM kunden
+
+-- Bad: German names with English prefixes and suffixes
+SELECT
+    kunde_id AS id
+  , is_aktiv
+  , beginn_date
+  , erstellt_at
+
+FROM kunden
 
 -- Good: base/raw model field renamings
 SELECT
