@@ -1064,7 +1064,7 @@ sources:
 
 * Depending on the BI tool, tables that are exposed in the BI tool should be documented for end users. Whenever possible, reporting table documentation should contain the metadata needed to sync dbt documentation from the dbt `.yml` file to the reporting tool. 
 
-  * Explain what the table contains – e.g. `fact_orders` described as `Represents an individual order`.
+  * Start the description with the grain, `One row per <entity> [per <time unit>]`, e.g. `fact_orders` described as `One row per order`. Then explain what the table contains.
 
   * Note what was filtered out from the table.
 
